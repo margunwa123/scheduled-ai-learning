@@ -2,3 +2,8 @@
 {"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:16.266434+00:00"}
 {"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:29.787210+00:00"}
 {"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:42.063990+00:00"}
+{"ticket_id": "t-001", "category": "technical", "urgency": "high", "queue": "technical-high", "routed_at": "2026-10-14T08:13:49.749686+00:00"}
+{"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T08:14:05.865663+00:00"}
+{"ticket_id": "t-003", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T08:14:16.881139+00:00"}
+{"ticket_id": "t-004", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T08:14:28.713681+00:00"}
+{"ticket_id": "t-005", "category": "other", "urgency": "low", "queue": "other-low", "routed_at": "2026-10-14T08:14:43.310372+00:00"}

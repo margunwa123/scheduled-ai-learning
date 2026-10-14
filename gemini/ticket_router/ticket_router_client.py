@@ -62,10 +62,10 @@ given.
 SAMPLE_TICKETS = [
     ("t-001", "My internet has been down since this morning, nobody's responded."),
     ("t-002", "Can I get a copy of my invoice from last month?"),
-    ("t-002", "Hi, I want to ask what's your refund policy?"),
-    ("t-002", "What's the pricnig tier?"),
-    ("t-002", "Is this mcdonalds?"),
-    ("t-003", "???"),
+    ("t-003", "Hi, I want to ask what's your refund policy?"),
+    ("t-004", "What's the pricnig tier?"),
+    ("t-005", "Is this mcdonalds?"),
+    ("t-006", "???"),
 ]
 
 
@@ -99,14 +99,31 @@ def mcp_tools_to_gemini_tools(mcp_tool_list: list[Tool]):
     ]
 
 
-MAX_RETRIES = 0
+MAX_RETRIES = 2
 
 
 def _extract_json_from_steps(steps) -> dict | None:
+    """Pull the classification JSON out of the model's text output.
+    Independent of whether a function_call also happened -- the
+    system_instruction asks for this JSON unconditionally, on every
+    ticket, whether or not routing follows.
+    """
+    text_parts = []
     for step in steps:
+        if getattr(step, "type", None) == "model_output":
+            for block in step.content:
+                if getattr(block, "type", None) == "text":
+                    text_parts.append(block.text)
         if getattr(step, "type", None) == "function_call":
             return getattr(step, "arguments", None)
-    return None
+    raw = "".join(text_parts).strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw.split("\n", 1)[-1] if "\n" in raw else raw
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 async def handle_ticket(
@@ -127,7 +144,7 @@ async def handle_ticket(
                 model="gemini-3.8-flash",
                 system_instruction=EXTRACTION_SYSTEM_INSTRUCTION,
                 generation_config={
-                    "max_output_tokens": 500,
+                    "max_output_tokens": 1000,
                     "thinking_level": "low",
                 },
                 tools=gemini_tools,
