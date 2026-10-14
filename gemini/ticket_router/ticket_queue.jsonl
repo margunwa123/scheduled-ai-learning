@@ -1,0 +1,4 @@
+{"ticket_id": "t-001", "category": "technical", "urgency": "high", "queue": "technical-high", "routed_at": "2026-10-14T06:46:02.464987+00:00"}
+{"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:16.266434+00:00"}
+{"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:29.787210+00:00"}
+{"ticket_id": "t-002", "category": "billing", "urgency": "low", "queue": "billing-low", "routed_at": "2026-10-14T06:46:42.063990+00:00"}
