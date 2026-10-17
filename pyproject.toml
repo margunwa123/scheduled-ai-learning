@@ -1,0 +1,18 @@
+[project]
+name = "ai-roadmap"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "qdrant-client",
+    "google-genai",
+    "python-dotenv",
+    "mcp[cli]",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "jupyterlab-lsp>=5.3.0",
+    "nbstripout>=0.9.1",
+    "python-lsp-server[all]>=1.15.0",
+]
