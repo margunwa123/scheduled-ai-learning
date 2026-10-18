@@ -7,11 +7,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 
-qdrant_storage/*
 qdrant_storage/
 
 # Jupyterlab
 .ipynb_checkpoints/
 
 .virtual_documents/
-.virtual_documents/*
+
+*.parquet
+*.npy

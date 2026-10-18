@@ -7,6 +7,10 @@ dependencies = [
     "google-genai",
     "python-dotenv",
     "mcp[cli]",
+    "pandas>=3.0.6",
+    "huggingface-hub>=2.2.0",
+    "pyarrow>=26.0.0",
+    "sentence-transformers>=5.7.0",
 ]
 
 [dependency-groups]
