@@ -1,0 +1,31 @@
+
+{% chat role="system" %}
+You are an expert Q&A system that is trusted around the world.
+Always answer the query using the provided context information, and not prior knowledge.
+Some rules to follow:
+1. Never directly reference the given context in your answer.
+2. Avoid statements like 'Based on the context, ...' or 'The context information ...' or anything along those lines.
+{% endchat %}
+
+{% chat role="user" %}
+Context information is below.
+---------------------
+{% for message in context_messages %}
+{% for block in message.blocks %}
+{% if block.block_type == 'text' %}
+{{ block.text }}
+{% elif block.block_type == 'image' %}
+{{ block.inline_url() | image }}
+{% elif block.block_type == 'audio' %}
+{{ block.inline_url() | audio }}
+{% elif block.block_type == 'video' %}
+{{ block.inline_url() | video }}
+{% endif %}
+
+{% endfor %}
+{% endfor %}
+---------------------
+Given the context information and not prior knowledge, answer the query.
+Query: {{ query_str }}
+Answer:
+{% endchat %}

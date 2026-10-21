@@ -16,3 +16,5 @@ qdrant_storage/
 
 *.parquet
 *.npy
+
+pgvector_storage/
