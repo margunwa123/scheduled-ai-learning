@@ -1,12 +1,12 @@
-"""FastAPI app wrapping the LangGraph agent, adapted to Lambda via Mangum.
+"""FastAPI app wrapping the LangGraph agent, deployed to Cloud Run.
 
-Mangum translates the API Gateway / Lambda Function URL event into an ASGI
-request FastAPI understands, and translates the response back -- so this is
-an ordinary FastAPI app everywhere except the last line.
+Cloud Run routes plain HTTP traffic straight to a container listening on
+$PORT, so this is an ordinary FastAPI app served by uvicorn -- no adapter
+layer needed (unlike Lambda, which required Mangum to translate its event
+format into an ASGI request).
 """
 
 from fastapi import FastAPI
-from mangum import Mangum
 from pydantic import BaseModel
 
 from app.agent import run_agent
@@ -31,7 +31,3 @@ def health():
 def query(req: QueryRequest):
     answer = run_agent(req.query)
     return QueryResponse(answer=answer)
-
-
-# Lambda's CMD points at "app.main.handler" -- this is that object.
-handler = Mangum(app)

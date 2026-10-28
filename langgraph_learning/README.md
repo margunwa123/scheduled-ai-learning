@@ -1,25 +1,27 @@
 # langgraph_learning (Phase 5, Section 6 deployment scaffold)
 
 Throwaway ReAct agent (a real calculator tool + a stub "stock price" tool,
-clearly labeled fake) whose only job is to prove out the Docker + Lambda
+clearly labeled fake) whose only job is to prove out the Docker + Cloud Run
 deployment path. Section 7 swaps `app/agent.py`'s tools and model prompt for
-the real IDX multi-agent graph; `app/main.py`'s FastAPI/Mangum wiring and the
+the real IDX multi-agent graph; `app/main.py`'s FastAPI wiring and the
 Dockerfile don't need to change.
 
 ## 1. Add dependencies (run from the repo root)
 
 ```
-uv add langgraph langchain-google-genai fastapi mangum
-uv add --dev uvicorn  # local testing only, not needed inside the Lambda image
+uv add --group deploy langgraph langchain-google-genai fastapi uvicorn
 ```
+
+`uvicorn` is a real runtime dependency here, not a local-only convenience --
+Cloud Run runs it directly as the production server, there's no Lambda-style
+event adapter in between.
 
 ## 2. Test locally first, before touching Docker
 
 ```
 export GEMINI_API_KEY=...        # same key you've used for Gemini elsewhere
 # --app-dir makes `app` a top-level package, matching the layout inside the
-# image (where app/ sits at ${LAMBDA_TASK_ROOT}), so `from app.agent import ...`
-# resolves identically here and on Lambda.
+# image, so `from app.agent import ...` resolves identically here and deployed.
 uv run uvicorn app.main:app --reload --app-dir langgraph_learning
 ```
 
@@ -33,33 +35,28 @@ to confirm the agent actually picks both tools.
 docker build -f langgraph_learning/Dockerfile -t langgraph-learning .
 ```
 
-## 4. Run the built image locally against the Lambda Runtime Interface Emulator
+## 4. Run the built image locally exactly as Cloud Run would
 
-AWS's base image includes the emulator automatically when you `docker run`
-it (it listens on port 8080 inside the container):
-
-```
-docker run --rm -p 9000:8080 -e GEMINI_API_KEY=... langgraph-learning
-```
-
-Then from another terminal, invoke it the way Lambda's runtime would (this is
-NOT a normal HTTP call to your FastAPI routes -- it's the Lambda invoke
-wrapper, which is why the URL looks different from step 2):
+Cloud Run routes plain HTTP to a container listening on `$PORT` -- no event
+envelope, no invocation wrapper, so a local `docker run` is already an
+accurate simulation of production behavior:
 
 ```
-curl -s -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" \
-  -d '{"version":"2.0","routeKey":"POST /query","rawPath":"/query","requestContext":{"http":{"method":"POST","path":"/query"}},"body":"{\"query\":\"What is 9 * 9?\"}","isBase64Encoded":false}'
+docker run --rm -p 8080:8080 -e GEMINI_API_KEY=... -e PORT=8080 langgraph-learning
 ```
 
-If that returns a proper JSON answer, the container behaves correctly under
-Lambda's actual invocation model -- not just under plain uvicorn -- before
-you've spent anything pushing it to AWS.
+Then from another terminal, hit the routes directly, same as step 2:
+
+```
+curl -s localhost:8080/
+curl -s -X POST localhost:8080/query -H 'content-type: application/json' -d '{"query": "What is 9 * 9?"}'
+```
 
 ## Next (not yet done here)
 
-Lambda runs container images from **Amazon ECR**, not from a local Docker
-build directly -- the remaining steps are: create an ECR repository, tag and
-push this image to it, then create the Lambda function pointing at that image
-URI, with `GEMINI_API_KEY` set via Lambda's environment variables sourced from
-Secrets Manager (not a plaintext env var) per the Section 6 secrets note.
-Natural next step once this builds and runs clean locally.
+Cloud Run runs container images from **Artifact Registry**, not from a local
+Docker build directly -- the remaining steps are: create an Artifact
+Registry repository, tag and push this image to it, then deploy to Cloud Run
+pointing at that image, with `GEMINI_API_KEY` wired in from Secret Manager
+(not a plaintext env var) per the Section 6 secrets note. Natural next step
+once this builds and runs clean locally.

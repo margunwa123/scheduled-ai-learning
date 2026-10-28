@@ -23,7 +23,7 @@ resolution-markers = [
 name = "ai-roadmap"
 version = "0.1.0"
 source = { virtual = "." }
-default-groups = ["dev", "lambda"]
+default-groups = ["deploy", "dev"]
 dependencies = [
     { name = "google-genai" },
     { name = "huggingface-hub" },
@@ -43,18 +43,17 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+deploy = [
+    { name = "fastapi" },
+    { name = "langchain-google-genai" },
+    { name = "langgraph" },
+    { name = "uvicorn" },
+]
 dev = [
     { name = "ipykernel" },
     { name = "jupyterlab-lsp" },
     { name = "nbstripout" },
     { name = "python-lsp-server", extra = ["all"] },
-    { name = "uvicorn" },
-]
-lambda = [
-    { name = "fastapi" },
-    { name = "langchain-google-genai" },
-    { name = "langgraph" },
-    { name = "mangum" },
 ]
 
 [package.metadata]
@@ -77,18 +76,17 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+deploy = [
+    { name = "fastapi", specifier = ">=0.162.0" },
+    { name = "langchain-google-genai", specifier = ">=4.4.2" },
+    { name = "langgraph", specifier = ">=1.2.18" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
+]
 dev = [
     { name = "ipykernel", specifier = ">=7.4.0" },
     { name = "jupyterlab-lsp", specifier = ">=5.3.0" },
     { name = "nbstripout", specifier = ">=0.9.1" },
     { name = "python-lsp-server", extras = ["all"], specifier = ">=1.15.0" },
-    { name = "uvicorn", specifier = ">=0.54.0" },
-]
-lambda = [
-    { name = "fastapi", specifier = ">=0.162.0" },
-    { name = "langchain-google-genai", specifier = ">=4.4.2" },
-    { name = "langgraph", specifier = ">=1.2.18" },
-    { name = "mangum", specifier = ">=0.22.0" },
 ]
 
 [[package]]
@@ -2435,18 +2433,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1d/42/d4e1b004a041fcbad1e3acc804090a28161358ac567b0c74be2a3eef760c/llama_index_workflows-2.26.0.tar.gz", hash = "sha256:1aa685b678acbbd0a01a22e4d73aecd374cd12f923cf12ea83c5264f68bafa16", size = 159151, upload-time = "2026-10-11T15:00:02.452Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/74/35/f446e276b94d0602471d575def1407eb5248ac4edd05feef21419cb5149f/llama_index_workflows-2.26.0-py3-none-any.whl", hash = "sha256:c90cf7562f175f11cef5d5a657c38db0a21ce66bee07573c2c5a1f68cb8ae4df", size = 183259, upload-time = "2026-10-11T15:00:01.131Z" },
-]
-
-[[package]]
-name = "mangum"
-version = "0.22.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/82/c8/1579c705908d02a4526a748e8d0f0419151d4498c59033840f5df3a14822/mangum-0.22.0.tar.gz", hash = "sha256:701936891aaed8ed66479b871c2bda87ba288fd01c7d5dd6ba6c8e9ba1c239d1", size = 118290, upload-time = "2026-08-22T12:54:48.396Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/a2/21ee5d457ae79a2587ff0d4652990670b7cac84ba0eaab6e6865a3bd2515/mangum-0.22.0-py3-none-any.whl", hash = "sha256:a0595e3cc7a8091b22d8b3997bab5b2ad6aae7a5e40865e19c2015f5c959a93b", size = 17143, upload-time = "2026-08-22T12:54:46.924Z" },
 ]
 
 [[package]]

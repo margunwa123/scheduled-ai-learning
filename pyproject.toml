@@ -26,14 +26,13 @@ dev = [
     "jupyterlab-lsp>=5.3.0",
     "nbstripout>=0.9.1",
     "python-lsp-server[all]>=1.15.0",
-    "uvicorn>=0.54.0",
 ]
-lambda = [
+deploy = [
     "fastapi>=0.162.0",
     "langchain-google-genai>=4.4.2",
     "langgraph>=1.2.18",
-    "mangum>=0.22.0",
+    "uvicorn>=0.54.0",
 ]
 
 [tool.uv]
-default-groups = ["dev", "lambda"]
+default-groups = ["dev", "deploy"]
