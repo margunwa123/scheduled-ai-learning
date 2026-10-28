@@ -21,9 +21,6 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 
-from dotenv import load_dotenv
-
-load_dotenv()
 
 def calculator(expression: str) -> str:
     """Evaluate a simple arithmetic expression, e.g. '12.5 * 3 + 1'."""

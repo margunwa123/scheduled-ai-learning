@@ -8,11 +8,8 @@ an ordinary FastAPI app everywhere except the last line.
 from fastapi import FastAPI
 from mangum import Mangum
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 from app.agent import run_agent
-
-load_dotenv()
 
 app = FastAPI(title="langgraph_learning agent (Section 6 deployment scaffold)")
 
