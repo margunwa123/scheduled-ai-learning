@@ -149,6 +149,18 @@ Excerpt:
     return json.loads(response.text)
 
 
+def _embed_chunks(vo_client, chunks, batch_size=1000):
+    embeddings = []
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i : i + batch_size]
+        embeddings.extend(
+            vo_client.embed(
+                batch, model=EMBEDDING_MODEL,
+                input_type="document", output_dimension=EMBEDDING_DIM,
+            ).embeddings
+        )
+    return embeddings
+
 def ingest_filing(
     path: Path, vo_client: voyageai.Client, genai_client: genai.Client
 ) -> IngestResult:
@@ -176,12 +188,7 @@ def ingest_filing(
         # input_type="document" asks Voyage for the indexing-side embedding;
         # use input_type="query" on the retrieval side (search_filings) —
         # these are asymmetric and mixing them up hurts retrieval quality.
-        embeddings = vo_client.embed(
-            chunks,
-            model=EMBEDDING_MODEL,
-            input_type="document",
-            output_dimension=EMBEDDING_DIM,
-        ).embeddings
+        embeddings =_embed_chunks(vo_client=vo_client, chunks=chunks, batch_size=1000)
 
         with get_conn() as conn:
             for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
