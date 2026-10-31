@@ -51,11 +51,11 @@ def search_filings(
         rows = conn.execute(
             """
             SELECT doc_id, company, sector, classification, summary,
-                   chunk_index, chunk_text, embedding <-> %(embedding)s AS distance
+                   chunk_index, chunk_text, embedding <-> %(embedding)s::vector AS distance
             FROM filing_chunks
-            WHERE (%(sector)s IS NULL OR sector = %(sector)s)
-              AND (%(classification)s IS NULL OR classification = %(classification)s)
-              AND (%(company)s IS NULL OR company = %(company)s)
+            WHERE (%(sector)s::text IS NULL OR sector = %(sector)s)
+              AND (%(classification)s::text IS NULL OR classification = %(classification)s)
+              AND (%(company)s::text IS NULL OR company = %(company)s)
             ORDER BY distance
             LIMIT %(k)s
             """,
