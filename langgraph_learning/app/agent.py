@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Annotated, Literal, Optional, TypedDict
 from langchain_core.messages import (
     AIMessage,
@@ -28,9 +29,19 @@ load_dotenv()
 TOOLS = [search_filings, get_company_filings, list_sources_tool, delete_source_tool]
 
 HELPER_MODEL = os.environ.get("HELPER_MODEL", "gemini-3.8-flash")
-CRITIC_MODEL = os.environ.get("HELPER_MODEL", "gemini-3.8-flash")
+CRITIC_MODEL = os.environ.get("CRITIC_MODEL", "gemini-3.8-flash")
 
 MAX_CRITIC_RETRIES = 2
+
+# Set AGENT_TRACE=0 to silence this -- on by default for the CLI, but this
+# is the same agent.py that'll eventually sit behind FastAPI on Cloud Run,
+# where you don't want every request dumping internals to prod logs.
+TRACE = os.environ.get("AGENT_TRACE", "1") == "1"
+
+
+def _trace(label: str, msg: str) -> None:
+    if TRACE:
+        print(f"[{label}] {msg}")
 
 
 class State(TypedDict):
@@ -38,6 +49,23 @@ class State(TypedDict):
     critic_verdict: Optional[Literal["approve", "reject"]]
     critic_reasoning: Optional[str]
     critic_retries: int
+
+
+def _extract_text(content) -> str:
+    # AIMessage.content is str | list[str | dict] -- some providers (Gemini
+    # among them, via langchain_google_genai) return content as a list of
+    # parts like {"type": "text", "text": "..."} instead of a flat string.
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict) and "text" in part:
+                parts.append(part["text"])
+        return "".join(parts)
+    return str(content)
 
 
 HELPER_SYSTEM_PROMPT = """You are an IDX (Indonesia Stock Exchange) disclosure research \
@@ -58,14 +86,71 @@ def helper_node(state: State) -> dict:
     response = _helper_llm.invoke(
         [SystemMessage(HELPER_SYSTEM_PROMPT)] + state["messages"]
     )
+
+    if TRACE:
+        calls = getattr(response, "tool_calls", None)
+        if calls:
+            for c in calls:
+                _trace("helper", f"-> tool call: {c['name']}({c['args']})")
+        else:
+            preview = _extract_text(response.content)[:200]
+            _trace("helper", f"-> draft answer, no more tool calls: {preview!r}...")
+
     return {"messages": [response]}
 
 
 def helper_router(state: State) -> str:
     last = state["messages"][-1]
     if getattr(last, "tool_calls", None):
+        _trace("helper_router", "tool_calls present -> tools")
         return "tools"
+    _trace("helper_router", "no tool_calls -> critic")
     return "critic"
+
+
+# ---------------------------------------------------------------------------
+# tools node
+# ---------------------------------------------------------------------------
+
+_tool_node = ToolNode(TOOLS)
+
+# search_filings returns list[dict], which the @tool wrapper stringifies into
+# ToolMessage.content as a Python repr -- and the dict's own key order is
+# ["doc_id", "company", "sector", "classification", "summary", "chunk_index",
+# "chunk_text", "distance"]. "summary" is a full LLM-written paragraph that's
+# IDENTICAL for every chunk of a given doc_id, and it sits right before
+# chunk_index in that repr -- so a short preview can easily get eaten
+# entirely by `summary` before ever reaching chunk_index, making every
+# result look like a verbatim duplicate even when the chunks differ. Pull
+# chunk_index out with a regex instead of relying on where the preview
+# happens to get cut off, so we can tell "stuck on the same chunks" apart
+# from "different chunks, misleading preview" regardless of summary length.
+_CHUNK_INDEX_RE = re.compile(r"'chunk_index':\s*(\d+)")
+
+
+def tools_node(state: State) -> dict:
+    # Thin wrapper around the prebuilt ToolNode, just to print what's going
+    # in and out -- ToolNode itself has no trace hook, so this prints before
+    # and after delegating to its real logic rather than reimplementing it.
+    last = state["messages"][-1]
+    for call in getattr(last, "tool_calls", []) or []:
+        _trace("tools", f"calling {call['name']}({call['args']})")
+
+    result = _tool_node.invoke(state)
+
+    for msg in result.get("messages", []):
+        text = _extract_text(msg.content)
+        preview = text[:300]
+        suffix = "..." if len(text) > 300 else ""
+        chunk_indexes = _CHUNK_INDEX_RE.findall(text)
+        line = f"-> result: {preview!r}{suffix}"
+        if chunk_indexes:
+            # The bit that actually answers "is this looping on the same
+            # evidence" -- compare this list across consecutive calls.
+            line += f" | chunk_index(es): {chunk_indexes}"
+        _trace("tools", line)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +168,20 @@ _critic_llm = ChatGoogleGenerativeAI(model=CRITIC_MODEL)
 
 
 def _build_critic_prompt(messages: list[AnyMessage]) -> str:
-    query = next(m.content for m in messages if isinstance(m, HumanMessage))
+    # The *latest* real user question, not the first one in the thread --
+    # search in reverse, and skip past append_critic_feedback's own
+    # HumanMessage (tagged name="critic_feedback") so a mid-turn retry
+    # doesn't accidentally grab the critic's own feedback as "the question."
+    query = next(
+        m.content
+        for m in reversed(messages)
+        if isinstance(m, HumanMessage) and m.name != "critic_feedback"
+    )
+    # Evidence deliberately still scans the whole thread, not just this
+    # turn -- confirmed useful, not just a leftover bug: it's what let the
+    # critic correctly explain "...after the deletion of X" on a later turn
+    # using an earlier turn's tool result. Kept as a tradeoff (grows with
+    # session length) rather than "fixed" to scope-per-turn.
     evidence = "\n\n".join(
         f"[tool result] {m.content}" for m in messages if isinstance(m, ToolMessage)
     )
@@ -92,26 +190,12 @@ def _build_critic_prompt(messages: list[AnyMessage]) -> str:
     ].content  # helper_router only sends us here when this has no tool_calls
     return f"""Question:
 {query}
- 
+
 Evidence returned by tools:
 {evidence or "(no tool results — check whether the draft fabricated anything)"}
- 
+
 Draft answer to check:
 {draft}"""
-
-
-def _extract_text(content) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for part in content:
-            if isinstance(part, str):
-                parts.append(part)
-            elif isinstance(part, dict) and "text" in part:
-                parts.append(part["text"])
-        return "".join(parts)
-    return str(content)
 
 
 def critic_node(state: State) -> dict:
@@ -132,6 +216,9 @@ def critic_node(state: State) -> dict:
 
     if verdict == "reject":
         retries += 1
+
+    _trace("critic", f"verdict={verdict} retries={retries} reasoning={reasoning!r}")
+
     return {
         "critic_verdict": verdict,
         "critic_reasoning": reasoning,
@@ -141,9 +228,12 @@ def critic_node(state: State) -> dict:
 
 def critic_router(state: State) -> str:
     if state["critic_verdict"] == "approve":
+        _trace("critic_router", "approve -> action")
         return "approve"
     if state["critic_retries"] >= MAX_CRITIC_RETRIES:
+        _trace("critic_router", f"reject, retries={state['critic_retries']} exhausted -> insufficient_data")
         return "insufficient"
+    _trace("critic_router", f"reject, retries={state['critic_retries']} left -> retry")
     return "retry"
 
 
@@ -157,7 +247,8 @@ def append_critic_feedback(state: State) -> dict:
         f"A critic reviewed your last answer and rejected it: {state['critic_reasoning']}\n"
         "Revise your answer to address this — use more tool calls if you need more evidence."
     )
-    return {"messages": [HumanMessage(content=feedback)]}
+    _trace("append_critic_feedback", f"feeding back to helper: {feedback!r}")
+    return {"messages": [HumanMessage(content=feedback, name="critic_feedback")]}
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +257,8 @@ def append_critic_feedback(state: State) -> dict:
 
 
 def action_node(state: State) -> dict:
+    # Stub -- Stage 5 adds the real notability judgment + alert drafting.
+    _trace("action", "approved (stub -- no notability judgment yet)")
     return {}
 
 
@@ -174,6 +267,7 @@ def insufficient_data_node(state: State) -> dict:
         "I don't have strong enough evidence to answer this confidently. "
         f"Last concern raised: {state.get('critic_reasoning') or 'none recorded'}"
     )
+    _trace("insufficient_data", "bailing out -- no LLM call here, deterministic")
     return {"messages": [AIMessage(content=content)]}
 
 
@@ -181,7 +275,7 @@ def build_graph():
     graph = StateGraph(State)
 
     graph.add_node("helper", helper_node)
-    graph.add_node("tools", ToolNode(TOOLS))
+    graph.add_node("tools", tools_node)
     graph.add_node("critic", critic_node)
     graph.add_node("append_critic_feedback", append_critic_feedback)
     graph.add_node("action", action_node)
